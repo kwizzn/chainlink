@@ -72,11 +72,11 @@ describe('KeeperRegistrar', () => {
   const emptyBytes = '0x00'
   const stalenessSeconds = BigNumber.from(43820)
   const gasCeilingMultiplier = BigNumber.from(1)
-  const maxCheckGas = BigNumber.from(20000000)
+  const checkGasLimit = BigNumber.from(20000000)
   const fallbackGasPrice = BigNumber.from(200)
   const fallbackLinkPrice = BigNumber.from(200000000)
   const maxPerformGas = BigNumber.from(5000000)
-  const minLINKJuels = BigNumber.from('1000000000000000000')
+  const minUpkeepSpend = BigNumber.from('1000000000000000000')
   const amount = BigNumber.from('5000000000000000000')
   const amount1 = BigNumber.from('6000000000000000000')
 
@@ -114,30 +114,30 @@ describe('KeeperRegistrar', () => {
     linkEthFeed = await mockV3AggregatorFactory
       .connect(owner)
       .deploy(9, linkEth)
-    registry = await keeperRegistryFactory
-      .connect(owner)
-      .deploy(
-        1234,
-        linkToken.address,
-        linkEthFeed.address,
-        gasPriceFeed.address,
+    registry = await keeperRegistryFactory.connect(owner).deploy(
+      1234,
+      linkToken.address,
+      linkEthFeed.address,
+      gasPriceFeed.address,
+      {
         paymentPremiumPPB,
         flatFeeMicroLink,
         blockCountPerTurn,
-        maxCheckGas,
+        checkGasLimit,
         stalenessSeconds,
         gasCeilingMultiplier,
-        fallbackGasPrice,
-        fallbackLinkPrice,
+        minUpkeepSpend,
         maxPerformGas,
-        minLINKJuels,
-      )
+      },
+      fallbackGasPrice,
+      fallbackLinkPrice,
+    )
 
     mock = await upkeepMockFactory.deploy()
 
     registrar = await keeperRegistrar
       .connect(registrarOwner)
-      .deploy(linkToken.address, minLINKJuels)
+      .deploy(linkToken.address, minUpkeepSpend)
 
     await linkToken
       .connect(owner)
@@ -181,7 +181,7 @@ describe('KeeperRegistrar', () => {
           window_small,
           threshold_big,
           registry.address,
-          minLINKJuels,
+          minUpkeepSpend,
         )
 
       const abiEncodedBytes = registrar.interface.encodeFunctionData(
@@ -263,7 +263,7 @@ describe('KeeperRegistrar', () => {
           window_small,
           threshold_big,
           registry.address,
-          minLINKJuels,
+          minUpkeepSpend,
         )
 
       //register with auto approve ON
@@ -311,7 +311,7 @@ describe('KeeperRegistrar', () => {
           window_small,
           threshold_big,
           registry.address,
-          minLINKJuels,
+          minUpkeepSpend,
         )
 
       //register with auto approve OFF
@@ -361,7 +361,7 @@ describe('KeeperRegistrar', () => {
           window_big,
           threshold_small,
           registry.address,
-          minLINKJuels,
+          minUpkeepSpend,
         )
 
       let abiEncodedBytes = registrar.interface.encodeFunctionData('register', [
@@ -413,7 +413,6 @@ describe('KeeperRegistrar', () => {
     })
 
     it('Auto Approve Sender Allowlist - sender in allowlist - registers an upkeep on KeeperRegistry instantly and emits both RegistrationRequested and RegistrationApproved events', async () => {
-      const upkeepCount = await registry.getUpkeepCount()
       const senderAddress = await requestSender.getAddress()
 
       //set auto approve to ENABLED_SENDER_ALLOWLIST type with high threshold limits
@@ -424,7 +423,7 @@ describe('KeeperRegistrar', () => {
           window_small,
           threshold_big,
           registry.address,
-          minLINKJuels,
+          minUpkeepSpend,
         )
 
       // Add sender to allowlist
@@ -451,8 +450,10 @@ describe('KeeperRegistrar', () => {
         .connect(requestSender)
         .transferAndCall(registrar.address, amount, abiEncodedBytes)
 
+      const [id] = await registry.getActiveUpkeepIDs(0, 1)
+
       //confirm if a new upkeep has been registered and the details are the same as the one just registered
-      const newupkeep = await registry.getUpkeep(upkeepCount)
+      const newupkeep = await registry.getUpkeep(id)
       assert.equal(newupkeep.target, mock.address)
       assert.equal(newupkeep.admin, await admin.getAddress())
       assert.equal(newupkeep.checkData, emptyBytes)
@@ -475,7 +476,7 @@ describe('KeeperRegistrar', () => {
           window_small,
           threshold_big,
           registry.address,
-          minLINKJuels,
+          minUpkeepSpend,
         )
 
       // Explicitly remove sender from allowlist
@@ -566,7 +567,7 @@ describe('KeeperRegistrar', () => {
           window_small,
           threshold_big,
           registry.address,
-          minLINKJuels,
+          minUpkeepSpend,
         )
 
       //register with auto approve OFF
@@ -717,7 +718,7 @@ describe('KeeperRegistrar', () => {
           window_small,
           threshold_big,
           registry.address,
-          minLINKJuels,
+          minUpkeepSpend,
         )
 
       //register with auto approve OFF
